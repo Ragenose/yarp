@@ -24,14 +24,18 @@ class yarp{
         void checkMemoryChange();
         void checkOperation();
         void showResult();
-        void mov_30(); //30
+        void mov_20();  //mov 20 
+        void mov_30();  //mov 30
         void sub();
         void add();
         void and_62();
         void str_41();
         void str_51();
+        void push();
+        void pop();
         int findRa();
         int findRb();
+        void checkFlag(int,int,int);
 
     public:
         yarp(int);

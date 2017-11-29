@@ -11,7 +11,8 @@ int main(int argc, char* argv[]){
 	const int maxsize = 1024;
 	int size;
 	unsigned char * buff = new unsigned char[maxsize];
-	int length = argv[2][0] - '0';	//get the argument length
+	string temp = argv[2];
+	int length = atoi(temp.c_str());	//get the argument length
 	yarp sim(length);
 	sim.read(argv[1]); //read file and store it to buffer
 	sim.compile();	   //run the bytes
