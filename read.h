@@ -17,6 +17,7 @@ class yarp{
         int memoSize;
         int r0,r1,r2,r3,r4,r5,r6,sp,pc,n,z,c,v;
         int buffSize;
+        int status;
 
         void copy(int);
         string checkOperation(unsigned char, int &);
@@ -24,19 +25,25 @@ class yarp{
         void checkMemoryChange();
         void checkOperation();
         void showResult();
+        void halt();
         void mov_20();  //mov 20 
         void mov_30();  //mov 30
+        void b();
         void sub();
         void add();
         void and_62();
+        void eor();
+        void ldr_40();
         void str_41();
+        void ldr_50();
         void str_51();
         void push();
         void pop();
         int findRa();
         int findRb();
+        void setRa(int);
         void checkFlag(int,int,int);
-
+        bool checkAddress(int);
     public:
         yarp(int);
         void read(char* );

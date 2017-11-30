@@ -2,6 +2,7 @@
 #include <fstream>
 #include <cstdio>
 #include <cstring>
+#include <stdlib.h>
 #include "read.h"
 using namespace std;
 //Zuoxiu Xing

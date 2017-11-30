@@ -1,6 +1,5 @@
 #include "read.h"
 
-
 int getsize(FILE * file) {
 	int size;
 	fseek(file, 0, SEEK_END);  //go to the end of file
@@ -11,6 +10,7 @@ int getsize(FILE * file) {
 
 yarp::yarp(int alength){
 	r0 = r1 = r2 = r3 = r4 = r5 = r6 = sp = pc = n = z = c = v=0;
+	status = 1;
 	length = alength;
 	maxsize = 1024;
 	memoSize = 4096;
@@ -38,10 +38,12 @@ void yarp::display(){
 	int line =1;
 	int tempSize;
 	string opName;
+	string stat;
 	//traversal every element in the buffer
-	while (counter < buffSize && line <= length){
+	while (counter < pc && line <= length){
 		int lineLength=0;
-		cout <<"pc = "<<setw(3)<<setfill('0')<<counter<<": " << "step: " << line;  //print the index
+		cout << setw(2)<<setfill('0')<<dec<<line<<" ";
+		cout <<"pc = "<<setw(3)<<setfill('0')<<hex<<counter<<": ";  //print the index
 		opName = checkOperation(buff[counter],tempSize);   			//check the operation
 		for( int i =0; i<tempSize;i++){
 			cout <<" "<< hex << setw(2) << setfill('0') << int(buff[counter]);	//print elements
@@ -51,9 +53,15 @@ void yarp::display(){
 		line++;
 		cout << setw(20-lineLength+(6-lineLength))<<setfill(' ') << opName << endl;	//print the name
 	}
-
-	cout << "Stopped in "<<line-1<<" steps at PC=0x"<<hex<<setw(3)<<setfill('0')<<pc<<
-	"  CC: "<<" N = "<<n<<" Z = " << z <<" C = "<<c<<" V = "<<v<<endl;
+	switch(status){
+		case 1: stat = "AOK";break;
+		case 2: stat = "HLT";break;
+		case 3: stat = "ADR";break;
+		case 4: stat = "INS";break;
+		default: stat = "Unknown status";
+	}
+	cout << "Stopped in "<<dec<<line-1<<" steps at PC=0x"<<hex<<setw(3)<<setfill('0')<<pc<<
+	" Status "<<"'"<<stat<<"'"<<" CC: "<<" N = "<<n<<" Z = " << z <<" C = "<<c<<" V = "<<v<<endl;
 	cout <<"Changes to registers: "<<endl;
 	checkRegisterChange();
 	cout << endl;
@@ -107,6 +115,7 @@ void yarp::checkMemoryChange(){
 }
 
 //use switch statement to check the operation name and the length of the operation
+//for displaying purpose
 string yarp::checkOperation(unsigned char temp , int &size){
 	switch(temp){
 		case 0x00: {
@@ -241,60 +250,59 @@ string yarp::checkOperation(unsigned char temp , int &size){
 }
 
 //check which operation it is and call that function
+//for running simulator
 void yarp::checkOperation(){
-	int size= 1;
 	unsigned char temp = buff[pc];
 	switch(temp){
 	case 0x00: {
+			copy(1);
+			halt();
 			break;
 		}
 		case 0x10: {
 			break;
 		}
 		case 0x20: {
-			size = 2;
-			copy(size);
+			copy(2);
 			mov_20();
 			break;
 		}
 		case 0x30: {
-			size = 6;
-			copy(size);
+			copy(6);
 			mov_30();
 			break;
 		}
 		case 0x40: {
+			copy(2);
+			ldr_40();
 			break;
 		}
 		case 0x41: {
-			size = 2;
-			copy(size);
+			copy(2);
 			str_41();
 			break;
 		}
 		case 0x50: {
+			copy(6);
+			ldr_50();
 			break;
 		}
 		case 0x51: {
-			size = 6;
-			copy(size);
+			copy(6);
 			str_51();
 			break;
 		}
 		case 0x60:{
-			size = 2;
 			copy(2);
 			add();
 			break;
 		}
 		case 0x61:{
-			size = 2;
 			copy(2);
 			sub();
 			break;
 		}
 		case 0x62:{
-			size = 2;
 			copy(2);
 			and_62();
 			break;
@@ -309,79 +317,132 @@ void yarp::checkOperation(){
 			break;
 		}
 		case 0xa0: {
-			size = 2;
-			copy(size);
+			copy(2);
 			push();
 			break;
 		}
 		case 0xb0: {
-			size = 2;
-			copy(size);
+			copy(2);
 			pop();
 			break;
 		}
-		case 0x70: {
-			size = 5;
-			break;
-		}
-		case 0x71: {
-			size = 5;
-			break;
-		}
-		case 0x72: {
-			size = 5;
-			break;
-		}
-		case 0x73: {
-			size = 5;
-			break;
-		}
-		case 0x74: {
-			size = 5;
-			break;
-		}
-		case 0x75: {
-			size = 5;
-			break;
-		}
-		case 0x76: {
-			size = 5;
-			break;
-		}
-		case 0x77: {
-			size = 5;
-			break;
-		}
-		case 0x78: {
-			size = 5;
-			break;
-		}
-		case 0x79: {
-			size = 5;
-			break;
-		}
-		case 0x7a: {
-			size = 5;
-			break;
-		}
-		case 0x7b: {
-			size = 5;
-			break;
-		}
-		case 0x7c: {
-			size = 5;
-			break;
-		}
-		case 0x7d: {
-			size = 5;
-			break;
-		}
-		case 0x7e: {
-			size = 5;
-			break;
-		}
+		//illegal instruction
 		default: {
-			pc += 1;
+			if(temp >> 4 == 0x7){
+				switch((temp & 0xf)){
+					case 0x0: {
+						if(z == 1){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0x1: {
+						if(z == 0){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0x2: {
+						if(c == 1){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0x3: {
+						if(c == 0){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0x4: {
+						if(z == 1){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0x5: {
+						if(n == 0){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0x6: {
+						if(v == 1){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0x7: {
+						if(v == 0){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0x8: {
+						if(c == 1 && z == 0){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0x9: {
+						if(c == 0 || z == 1){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0xa: {
+						if(n == v){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0xb: {
+						if(n != v){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0xc: {
+						if(z == 0 && n == v){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0xd: {
+						if(z == 0 && n != v){
+							copy(5);
+							b();
+						}
+						break;
+					}
+					case 0xe: {
+						copy(5);
+						b();
+						break;
+					}
+					default:{
+						status = 4;
+						copy(1);
+					}
+				}
+			}
+			else{
+				status = 4;
+				copy(1);
+			}
 		}
 	}
 
@@ -396,249 +457,117 @@ void yarp::copy(int size){
 	pc+=size;
 }
 
+//halt function
+void yarp::halt(){
+	status = 2;
+}
+
 //mov 20 function
 void yarp::mov_20(){
 	int value = findRb();
-	switch(tempBuff[1]>>4){			//check which register will be moved
-		case 0x0: {
-			r0 = value;				//move the value into the register
-			break;
-		}
-		case 0x1: {
-			r1 =value;
-			break;
-		}
-		case 0x2: {
-			r2 =value;
-			break;
-		}
-		case 0x3: {
-			r3 =value;
-			break;
-		}
-		case 0x4: {
-			r4 =value;
-			break;
-		}
-		case 0x5: {
-			r5 =value;
-			break;
-		}
-		case 0x6: {
-			r6 =value;
-			break;
-		}
-		case 0x7: {
-			sp = value;
-			break;
-		}
-	}
+	setRa(value);
 }
+
 //mov 30 function
 void yarp::mov_30(){
 	int value=0;
 	for(int i =0;i<4;i++){		//get the 32 bit value
 		value |= (int)(tempBuff[2+i] << (i*8));
 	}
-	switch(tempBuff[1]>>4){			//check which register will be moved
-		case 0x0: {
-			r0 = value;				//move the value into the register
-			break;
-		}
-		case 0x1: {
-			r1 =value;
-			break;
-		}
-		case 0x2: {
-			r2 =value;
-			break;
-		}
-		case 0x3: {
-			r3 =value;
-			break;
-		}
-		case 0x4: {
-			r4 =value;
-			break;
-		}
-		case 0x5: {
-			r5 =value;
-			break;
-		}
-		case 0x6: {
-			r6 =value;
-			break;
-		}
-		case 0x7: {
-			sp = value;
-			break;
-		}
-	}
+	setRa(value);
 }
 
 //add function
 void yarp::add(){
-	int ra,rb = 0;
-	int result = 0;
+	int ra,rb,result = 0;
+	ra = findRa();
 	rb = findRb();
-	switch(tempBuff[1]>>4){			//find which register is ra
-		case 0x0: {
-			ra = r0;
-			r0 +=rb;				//store ra-rb into the register
-			result = r0;
-			break;
-		}
-		case 0x1: {
-			ra = r1;
-			r1 +=rb;
-			result = r1;
-			break;
-		}
-		case 0x2: {
-			ra = r2;
-			r2 +=rb;
-			result = r2;
-			break;
-		}
-		case 0x3: {
-			ra = r3;
-			r3 +=rb;
-			result = r3;
-			break;
-		}
-		case 0x4: {
-			ra = r4;
-			r4 +=rb;
-			result = r4;
-			break;
-		}
-		case 0x5: {
-			ra = r5;
-			r5 +=rb;
-			result = r5;
-			break;
-		}
-		case 0x6: {
-			ra = r6;
-			r6 +=rb;
-			result = r6;
-			break;
-		}
-		case 0x7: {
-			ra = sp;
-			sp +=rb;
-			result = sp;
-			break;
-		}
-	}
+	result = ra + rb;
+	setRa(result);
 	checkFlag(ra,rb,result);
+	//when ra is negative and result is postive, set c = 1, otherwise 0
+	if((ra >> 31 == 0xffffffff)  &&(ra >> 31) != (result >> 31)){
+		c = 1;
+	}
+	else{
+		c = 0;
+	}
 }
 
 //sub function
 void yarp::sub(){
-	int ra,rb = 0;
-	int result = 0;
+	int ra,rb,result = 0;
+	ra = findRa();
 	rb = findRb();
-	switch(tempBuff[1]>>4){			//find which register is ra
-		case 0x0: {
-			ra = r0;
-			r0 -=rb;				//store ra-rb into the register
-			result = r0;
-			break;
-		}
-		case 0x1: {
-			ra = r1;
-			r1 -=rb;
-			result = r1;
-			break;
-		}
-		case 0x2: {
-			ra = r2;
-			r2 -=rb;
-			result = r2;
-			break;
-		}
-		case 0x3: {
-			ra = r3;
-			r3 -=rb;
-			result = r3;
-			break;
-		}
-		case 0x4: {
-			ra = r4;
-			r4 -=rb;
-			result = r4;
-			break;
-		}
-		case 0x5: {
-			ra = r5;
-			r5 -=rb;
-			result = r5;
-			break;
-		}
-		case 0x6: {
-			ra = r6;
-			r6 -=rb;
-			result = r6;
-			break;
-		}
-		case 0x7: {
-			ra = sp;
-			sp -=rb;
-			result = sp;
-			break;
-		}
-	}
+	result = ra - rb;
+	setRa(result);
 	checkFlag(ra,rb,result);
+	//when ra is bigger than rb, there is no borrow, set c = 1, otherwise 0
+	if(ra >= rb){
+		c = 1;
+	}
+	else{
+		c = 0;
+	}
 }
 
 //and function
 void yarp::and_62(){
-	int ra,rb = 0;
+	int ra,rb,result = 0;
+	ra = findRa();
 	rb = findRb();
-	switch(tempBuff[1]>>4){			//find which register is ra
-		case 0x0: {
-			r0 &=rb;				//store ra-rb into the register
-			break;
+	result = ra & rb;
+	setRa(result);
+	checkFlag(ra,rb,result);	
+}
+
+//eor function
+void yarp::eor(){
+	int ra,rb,result = 0;
+	ra = findRa();
+	rb = findRb();
+	result = ra ^ rb;
+	setRa(result);
+	checkFlag(ra,rb,result);
+}
+
+//ldr_40 function
+void yarp::ldr_40(){
+	int address = findRb();
+	int value = 0;
+	if(checkAddress(address)){
+		for(int i =0; i<4;i++){
+			value |= (memo[address + i]) << i*8;
 		}
-		case 0x1: {
-			r1 &=rb;
-			break;
-		}
-		case 0x2: {
-			r2 &=rb;
-			break;
-		}
-		case 0x3: {
-			r3 &=rb;
-			break;
-		}
-		case 0x4: {
-			r4 &=rb;
-			break;
-		}
-		case 0x5: {
-			r5 &=rb;
-			break;
-		}
-		case 0x6: {
-			r6 &=rb;
-			break;
-		}
-		case 0x7: {
-			sp &=rb;
-			break;
-		}
+		setRa(value);
 	}
-	
 }
 
 //str_41 function
 void yarp::str_41(){
 	int value = findRa();
 	int address = findRb();
-	for(int i =0;i<4;i++){
-		memo[address + i] = (value >> (8*i))& 0xff;
+	if(checkAddress(address)){
+		for(int i =0;i<4;i++){
+			memo[address + i] = (value >> (8*i))& 0xff;
+		}
+	}
+}
+
+//ldr_50 function
+void yarp::ldr_50(){
+	int value = findRa();			//get value that needs to be stored
+	int address = findRb();			//get address to store the value
+	int temp = 0;
+	for(int i =0;i<4;i++){		//get the 32 bit value
+		temp |= (int)(tempBuff[2+i] << (i*8));
+	}
+	address+=temp;					//add the address with 32 bit value
+	if(checkAddress(address)){
+		for(int i =0; i<4;i++){
+			value |= (memo[address + i]) << i*8;
+		}
+		setRa(value);
 	}
 }
 
@@ -651,63 +580,33 @@ void yarp::str_51(){
 		temp |= (int)(tempBuff[2+i] << (i*8));
 	}
 	address+=temp;					//add the address with 32 bit value
-	for(int i =0;i<4;i++){
-		memo[address + i] = (value >> (8*i)) & 0xff;	//store the value
+	if(checkAddress(address)){
+		for(int i =0;i<4;i++){
+			memo[address + i] = (value >> (8*i))& 0xff;
+		}
 	}
 }
 
 //push function
 void yarp::push(){
 	int value = findRa();
-	for(int i = 3 ; i>=0 ;i--){
-		sp--;
-		memo[sp] = (value >> 8*i) & 0xff;
-		
+	if(checkAddress(sp)){
+		for(int i = 3 ; i>=0 ;i--){
+			sp--;
+			memo[sp] = (value >> 8*i) & 0xff;  //store each byte into memory
+		}
 	}
-	
 }
 
 //pop function
 void yarp::pop(){
 	int value = 0;
-	for(int i =0;i<4;i++){
-		value |= (memo[sp + i]) << i*8;
-	}
-	sp+=4;
-
-	switch(tempBuff[1]>>4){			//find which register is ra
-		case 0x0: {
-			r0 = value;				//store ra-rb into the register
-			break;
+	if(checkAddress(sp)){
+		for(int i =0;i<4;i++){
+			value |= (memo[sp + i]) << i*8;		//load from the address
 		}
-		case 0x1: {
-			r1 = value;
-			break;
-		}
-		case 0x2: {
-			r2 = value;
-			break;
-		}
-		case 0x3: {
-			r3 = value;
-			break;
-		}
-		case 0x4: {
-			r4 = value;
-			break;
-		}
-		case 0x5: {
-			r5 = value;
-			break;
-		}
-		case 0x6: {
-			r6 = value;
-			break;
-		}
-		case 0x7: {
-			sp = value;
-			break;
-		}
+		sp+=4;
+		setRa(value);		  //store into the register
 	}
 }
 
@@ -791,6 +690,44 @@ int yarp::findRb(){
 	return rb;
 }
 
+//set ra to result
+void yarp::setRa(int result){
+	switch(tempBuff[1]>>4){			//find which register is ra
+		case 0x0: {
+			r0 = result;				//store ra-rb into the register
+			break;
+		}
+		case 0x1: {
+			r1= result;
+			break;
+		}
+		case 0x2: {
+			r2 = result;
+			break;
+		}
+		case 0x3: {
+			r3 = result;
+			break;
+		}
+		case 0x4: {
+			r4 = result;
+			break;
+		}
+		case 0x5: {
+			r5 = result;
+			break;
+		}
+		case 0x6: {
+			r6 = result;
+			break;
+		}
+		case 0x7: {
+			sp = result;
+			break;
+		}
+	}
+}
+
 //checkflag
 void yarp::checkFlag(int ra,int rb, int result){
 	//check zero
@@ -802,8 +739,7 @@ void yarp::checkFlag(int ra,int rb, int result){
 		z = 0;
 	}
 	//check negative
-	//if result >> 31 = 0xffffffff
-	//then result is negative
+	//if result >> 31 = 0xffffffff, then result is negative
 	if((result >> 31) == -1){	
 		n =1;					
 	}
@@ -812,18 +748,30 @@ void yarp::checkFlag(int ra,int rb, int result){
 	}
 	//check overflow
 	//if signs of ra and rb are the same and sign of result is different
-	//then there is overflow
-	if((ra>>31 != result >>31)){
-		v = 1;
+	//then there are overflow and carry
+	if((ra >>31 == rb >> 31) && (ra>>31 != result >>31)){
+		v = c = 1;
 	}
 	else{
-		v = 0;
+		v = c = 0;
 	}
+}
+
+//check if address is bigger than the maxsize
+bool yarp::checkAddress(int address){
+	if(address <0 || address >memoSize){
+		status = 3;
+		return false;  //if address is not valid return false
+	}
+	return true;
 }
 
 //try to run each step
 void yarp::compile(){
 	for(int i =0;i<length;i++){
 		checkOperation();
+		if(status != 1){  //if any changed status, stop simulating
+			i = length;
+		}
 	}
 }
