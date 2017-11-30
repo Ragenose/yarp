@@ -16,7 +16,7 @@ int main(int argc, char* argv[]){
 	int length = atoi(temp.c_str());	//get the argument length
 	yarp sim(length);
 	sim.read(argv[1]); //read file and store it to buffer
-	sim.compile();	   //run the bytes
-	sim.display();     //show result
+	sim.run();	   //run the bytes
+	sim.result();     //show result
 	return 0;
 }

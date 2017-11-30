@@ -13,6 +13,7 @@ class yarp{
         unsigned char* memo;
         unsigned char* buff;
         unsigned char* tempBuff;
+        int lineNum;
         int maxsize;
         int memoSize;
         int r0,r1,r2,r3,r4,r5,r6,sp,pc,n,z,c,v;
@@ -44,10 +45,10 @@ class yarp{
         void setRa(int);
         void checkFlag(int,int,int);
         bool checkAddress(int);
+        void display(int,int,string);
     public:
         yarp(int);
         void read(char* );
-        void compile();
-        void display();
-        
+        void run();
+        void result();
 };

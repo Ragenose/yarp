@@ -14,6 +14,7 @@ yarp::yarp(int alength){
 	length = alength;
 	maxsize = 1024;
 	memoSize = 4096;
+	lineNum = 1;
 	buff = new unsigned char[maxsize];
 	memo = new unsigned char[memoSize];
 	memset(memo, 0, 4096);
@@ -33,26 +34,9 @@ void yarp::read(char* filename){
 	}
 }
 
-void yarp::display(){
-	int counter = 0;
-	int line =1;
-	int tempSize;
-	string opName;
+//display change in registers, memory, status, flags
+void yarp::result(){
 	string stat;
-	//traversal every element in the buffer
-	while (counter < pc && line <= length){
-		int lineLength=0;
-		cout << setw(2)<<setfill('0')<<dec<<line<<" ";
-		cout <<"pc = "<<setw(3)<<setfill('0')<<hex<<counter<<": ";  //print the index
-		opName = checkOperation(buff[counter],tempSize);   			//check the operation
-		for( int i =0; i<tempSize;i++){
-			cout <<" "<< hex << setw(2) << setfill('0') << int(buff[counter]);	//print elements
-			counter ++;
-			lineLength ++;
-		}
-		line++;
-		cout << setw(20-lineLength+(6-lineLength))<<setfill(' ') << opName << endl;	//print the name
-	}
 	switch(status){
 		case 1: stat = "AOK";break;
 		case 2: stat = "HLT";break;
@@ -60,7 +44,7 @@ void yarp::display(){
 		case 4: stat = "INS";break;
 		default: stat = "Unknown status";
 	}
-	cout << "Stopped in "<<dec<<line-1<<" steps at PC=0x"<<hex<<setw(3)<<setfill('0')<<pc<<
+	cout << "Stopped in "<<dec<<lineNum-1<<" steps at PC=0x"<<hex<<setw(3)<<setfill('0')<<pc<<
 	" Status "<<"'"<<stat<<"'"<<" CC: "<<" N = "<<n<<" Z = " << z <<" C = "<<c<<" V = "<<v<<endl;
 	cout <<"Changes to registers: "<<endl;
 	checkRegisterChange();
@@ -329,107 +313,93 @@ void yarp::checkOperation(){
 		//illegal instruction
 		default: {
 			if(temp >> 4 == 0x7){
+				copy(5);
 				switch((temp & 0xf)){
 					case 0x0: {
 						if(z == 1){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0x1: {
 						if(z == 0){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0x2: {
 						if(c == 1){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0x3: {
 						if(c == 0){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0x4: {
-						if(z == 1){
-							copy(5);
+						if(n == 1){
 							b();
 						}
 						break;
 					}
 					case 0x5: {
 						if(n == 0){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0x6: {
 						if(v == 1){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0x7: {
 						if(v == 0){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0x8: {
 						if(c == 1 && z == 0){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0x9: {
 						if(c == 0 || z == 1){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0xa: {
 						if(n == v){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0xb: {
 						if(n != v){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0xc: {
 						if(z == 0 && n == v){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0xd: {
 						if(z == 0 && n != v){
-							copy(5);
 							b();
 						}
 						break;
 					}
 					case 0xe: {
-						copy(5);
 						b();
 						break;
 					}
@@ -459,7 +429,7 @@ void yarp::copy(int size){
 
 //halt function
 void yarp::halt(){
-	status = 2;
+	status = 2; //set status to HLT
 }
 
 //mov 20 function
@@ -610,6 +580,19 @@ void yarp::pop(){
 	}
 }
 
+//b function
+void yarp::b(){
+	int value = 0;
+	for(int i =0;i< 4;i++){
+		value |= tempBuff[1+i]<< i*8;
+	}
+	if(value < 0 || value >maxsize){	//check if the value is larger than the maxsize of instrucitons
+		status = 3;
+	}
+	else{
+		pc = value;						//set pc equals to the value
+	}
+}
 //return value of ra
 int yarp::findRa(){
 	int ra = 0;
@@ -766,10 +749,27 @@ bool yarp::checkAddress(int address){
 	return true;
 }
 
+//try to display any instuction is ran during the procss
+void yarp::display(int tempPC, int size, string name){
+	cout << "Line: "<<setw(2)<<setfill('0')<<dec<<lineNum<<" ";
+	cout << "PC: "<<setw(3)<<setfill('0')<<hex << tempPC << "  ";
+	for(int i =0;i<size;i++){
+		cout << setw(2)<<setfill('0')<<hex<<int(tempBuff[i])<<' ';
+	}
+	cout << setw(20)<<setfill(' ')<<name;
+	cout << endl;
+	lineNum ++ ;
+}
 //try to run each step
-void yarp::compile(){
+void yarp::run(){
+	int size;    //size of each line of the instruction
+	int tempPC;
+	string name; //name of the instruction
 	for(int i =0;i<length;i++){
+		name = checkOperation(buff[pc],size);
+		tempPC = pc;
 		checkOperation();
+		display(tempPC,size,name);
 		if(status != 1){  //if any changed status, stop simulating
 			i = length;
 		}
