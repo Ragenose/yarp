@@ -244,6 +244,7 @@ void yarp::checkOperation(){
 			break;
 		}
 		case 0x10: {
+			copy(1);
 			break;
 		}
 		case 0x20: {
@@ -295,19 +296,26 @@ void yarp::checkOperation(){
 			break;
 		}
 		case 0x80: {
+			copy(5);
+			call();
 			break;
 		}
 		case 0x90: {
+			copy(1);
+			ret();
 			break;
 		}
 		case 0xa0: {
 			copy(2);
-			push();
+			int value = findRa();
+			push(value);
 			break;
 		}
 		case 0xb0: {
 			copy(2);
-			pop();
+			int value = findRa();
+			pop(value);
+			setRa(value);
 			break;
 		}
 		//illegal instruction
@@ -558,10 +566,9 @@ void yarp::str_51(){
 }
 
 //push function
-void yarp::push(){
-	int value = findRa();
-	if(checkAddress(sp)){
-		for(int i = 3 ; i>=0 ;i--){
+void yarp::push(int value){
+	for(int i = 3 ; i>=0 ;i--){
+		if(checkAddress(sp)){
 			sp--;
 			memo[sp] = (value >> 8*i) & 0xff;  //store each byte into memory
 		}
@@ -569,14 +576,17 @@ void yarp::push(){
 }
 
 //pop function
-void yarp::pop(){
-	int value = 0;
-	if(checkAddress(sp)){
+void yarp::pop(int & value){
+	int tempValue = value;
+	value = 0;
+	if(checkAddress(sp)){				//if the address is invalid, the register will not change
 		for(int i =0;i<4;i++){
 			value |= (memo[sp + i]) << i*8;		//load from the address
 		}
 		sp+=4;
-		setRa(value);		  //store into the register
+	}
+	else{
+		value = tempValue;
 	}
 }
 
@@ -592,6 +602,20 @@ void yarp::b(){
 	else{
 		pc = value;						//set pc equals to the value
 	}
+}
+
+//call function
+void yarp::call(){
+	int value = 0;
+	for(int i =0;i< 4;i++){
+		value |= tempBuff[1+i]<< i*8;
+	}
+	push(pc);
+	pc = value;
+}
+
+void yarp::ret(){
+	pop(pc);
 }
 //return value of ra
 int yarp::findRa(){
@@ -740,7 +764,7 @@ void yarp::checkFlag(int ra,int rb, int result){
 	}
 }
 
-//check if address is bigger than the maxsize
+//check if address is bigger than the maxsize or smaller than 0
 bool yarp::checkAddress(int address){
 	if(address <0 || address >memoSize){
 		status = 3;
@@ -751,15 +775,18 @@ bool yarp::checkAddress(int address){
 
 //try to display any instuction is ran during the procss
 void yarp::display(int tempPC, int size, string name){
+	int counter = 0;
 	cout << "Line: "<<setw(2)<<setfill('0')<<dec<<lineNum<<" ";
 	cout << "PC: "<<setw(3)<<setfill('0')<<hex << tempPC << "  ";
 	for(int i =0;i<size;i++){
-		cout << setw(2)<<setfill('0')<<hex<<int(tempBuff[i])<<' ';
+		cout << setw(2)<<setfill('0')<<hex<<int(tempBuff[i])<<' ';    //display current instruction in temp buffer
+		counter ++;
 	}
-	cout << setw(20)<<setfill(' ')<<name;
+	cout << setw(30 - counter*3)<<setfill(' ')<<"| "<< name;
 	cout << endl;
 	lineNum ++ ;
 }
+
 //try to run each step
 void yarp::run(){
 	int size;    //size of each line of the instruction

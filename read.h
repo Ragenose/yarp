@@ -20,13 +20,15 @@ class yarp{
         int buffSize;
         int status;
 
-        void copy(int);
+        void copy(int); 
         string checkOperation(unsigned char, int &);
         void checkRegisterChange();
         void checkMemoryChange();
         void checkOperation();
         void showResult();
         void halt();
+        void call();
+        void ret();
         void mov_20();  //mov 20 
         void mov_30();  //mov 30
         void b();
@@ -38,8 +40,8 @@ class yarp{
         void str_41();
         void ldr_50();
         void str_51();
-        void push();
-        void pop();
+        void push(int);
+        void pop(int &);
         int findRa();
         int findRb();
         void setRa(int);
