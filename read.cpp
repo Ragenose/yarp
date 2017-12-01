@@ -487,6 +487,16 @@ void yarp::sub(){
 	else{
 		c = 0;
 	}
+	//if sign of ra and rb are different, if sign of result is not the same as ra
+	//overflow occurs and no borrow
+	if(ra >> 31 != rb >> 31){
+		if(ra >> 31 != result >> 31){
+			v = c = 1;
+		}
+		else{
+			v = c = 0;
+		}
+	}
 }
 
 //and function
@@ -735,7 +745,7 @@ void yarp::setRa(int result){
 	}
 }
 
-//checkflag
+//check flag n z v
 void yarp::checkFlag(int ra,int rb, int result){
 	//check zero
 	//if result is zero
