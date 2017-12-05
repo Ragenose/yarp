@@ -2,7 +2,7 @@
 #include <fstream>
 #include <cstdio>
 #include <iomanip>
-#include <cstring>
+#include <string>
 using namespace std;
 
 int getsize(FILE * file);
@@ -13,6 +13,7 @@ class yarp{
         unsigned char* memo;
         unsigned char* buff;
         unsigned char* tempBuff;
+        bool fileRead; //check if there is a file
         int lineNum;
         int maxsize;
         int memoSize;
@@ -50,6 +51,7 @@ class yarp{
         void display(int,int,string);
     public:
         yarp(int);
+        bool getFileRead();
         void read(char* );
         void run();
         void result();

@@ -13,11 +13,10 @@ yarp::yarp(int alength){
 	status = 1;
 	length = alength;
 	maxsize = 1024;
-	memoSize = 4096;
+	memoSize = 1024;
 	lineNum = 1;
 	buff = new unsigned char[maxsize];
 	memo = new unsigned char[memoSize];
-	memset(memo, 0, 4096);
 	tempBuff = new unsigned char[6];
 }
 
@@ -25,11 +24,12 @@ void yarp::read(char* filename){
 	FILE * file = fopen(filename, "rb");	//try to open the file
 
 	if (!file) {
-		cout << "could not open file" << endl;	//if cannot open the file, print error message
+		fileRead = false;
 	}
 	else {														//if can open the file
 		buffSize = getsize(file);								//get the size of the file
 		fread(buff, buffSize,1, file);								//read the file and store into the buffer
+		fileRead = true;
 		fclose(file);													//close file
 	}
 }
@@ -38,11 +38,11 @@ void yarp::read(char* filename){
 void yarp::result(){
 	string stat;
 	switch(status){
-		case 1: stat = "AOK";break;
-		case 2: stat = "HLT";break;
-		case 3: stat = "ADR";break;
-		case 4: stat = "INS";break;
-		default: stat = "Unknown status";
+		case 1: {stat = "AOK";break;}
+		case 2: {stat = "HLT";break;}
+		case 3: {stat = "ADR";break;}
+		case 4: {stat = "INS";break;}
+		default: {stat = "Unknown status";}
 	}
 	cout << "Stopped in "<<dec<<lineNum-1<<" steps at PC=0x"<<hex<<setw(3)<<setfill('0')<<pc<<
 	" Status "<<"'"<<stat<<"'"<<" CC: "<<" N = "<<n<<" Z = " << z <<" C = "<<c<<" V = "<<v<<endl;
@@ -224,7 +224,7 @@ string yarp::checkOperation(unsigned char temp , int &size){
 		}
 		case 0x7e: {
 			size = 5;
-			return "BAL";
+			return "B";
 		}
 		default: {
 				size = 1;
@@ -236,6 +236,7 @@ string yarp::checkOperation(unsigned char temp , int &size){
 //check which operation it is and call that function
 //for running simulator
 void yarp::checkOperation(){
+	int value = 0;
 	unsigned char temp = buff[pc];
 	switch(temp){
 	case 0x00: {
@@ -293,6 +294,8 @@ void yarp::checkOperation(){
 			break;
 		}
 		case 0x63:{
+			copy(2);
+			eor();
 			break;
 		}
 		case 0x80: {
@@ -307,13 +310,13 @@ void yarp::checkOperation(){
 		}
 		case 0xa0: {
 			copy(2);
-			int value = findRa();
+			value = findRa();
 			push(value);
 			break;
 		}
 		case 0xb0: {
 			copy(2);
-			int value = findRa();
+			value = findRa();
 			pop(value);
 			setRa(value);
 			break;
@@ -438,6 +441,7 @@ void yarp::copy(int size){
 //halt function
 void yarp::halt(){
 	status = 2; //set status to HLT
+	pc -=1;
 }
 
 //mov 20 function
@@ -463,6 +467,15 @@ void yarp::add(){
 	result = ra + rb;
 	setRa(result);
 	checkFlag(ra,rb,result);
+	//check overflow
+	//if signs of ra and rb are the same and sign of result is different
+	//then there are overflow and carry
+	if((ra >>31 == rb >> 31) && (ra>>31 != result >>31)){
+		v = c = 1;
+	}
+	else{
+		v = c = 0;
+	}
 	//when ra is negative and result is postive, set c = 1, otherwise 0
 	if((ra >> 31 == 0xffffffff)  &&(ra >> 31) != (result >> 31)){
 		c = 1;
@@ -480,6 +493,15 @@ void yarp::sub(){
 	result = ra - rb;
 	setRa(result);
 	checkFlag(ra,rb,result);
+	//check overflow
+	//if signs of ra and rb are the same and sign of result is different
+	//then there are overflow and carry
+	if((ra >>31 == rb >> 31) && (ra>>31 != result >>31)){
+		v = c = 1;
+	}
+	else{
+		v = c = 0;
+	}
 	//when ra is bigger than rb, there is no borrow, set c = 1, otherwise 0
 	if(ra >= rb){
 		c = 1;
@@ -529,6 +551,9 @@ void yarp::ldr_40(){
 		}
 		setRa(value);
 	}
+	else{
+		pc -= 2;
+	}
 }
 
 //str_41 function
@@ -539,6 +564,9 @@ void yarp::str_41(){
 		for(int i =0;i<4;i++){
 			memo[address + i] = (value >> (8*i))& 0xff;
 		}
+	}
+	else{
+		pc -=2;
 	}
 }
 
@@ -557,6 +585,9 @@ void yarp::ldr_50(){
 		}
 		setRa(value);
 	}
+	else{
+		pc -= 6;
+	}
 }
 
 //str_51 function
@@ -565,7 +596,7 @@ void yarp::str_51(){
 	int address = findRb();			//get address to store the value
 	int temp = 0;
 	for(int i =0;i<4;i++){		//get the 32 bit value
-		temp |= (int)(tempBuff[2+i] << (i*8));
+		temp |= int(tempBuff[2+i] << (i*8));
 	}
 	address+=temp;					//add the address with 32 bit value
 	if(checkAddress(address)){
@@ -573,15 +604,23 @@ void yarp::str_51(){
 			memo[address + i] = (value >> (8*i))& 0xff;
 		}
 	}
+	else{
+		pc -= 6;
+	}
 }
 
 //push function
+
+
 void yarp::push(int value){
 	for(int i = 3 ; i>=0 ;i--){
 		if(checkAddress(sp)){
 			sp--;
 			memo[sp] = (value >> 8*i) & 0xff;  //store each byte into memory
 		}
+	}
+	if(checkAddress(sp) == false){
+		pc -= 2;
 	}
 }
 
@@ -591,7 +630,7 @@ void yarp::pop(int & value){
 	value = 0;
 	if(checkAddress(sp)){				//if the address is invalid, the register will not change
 		for(int i =0;i<4;i++){
-			value |= (memo[sp + i]) << i*8;		//load from the address
+			value |= int(memo[sp + i]) << i*8;		//load from the address
 		}
 		sp+=4;
 	}
@@ -604,10 +643,11 @@ void yarp::pop(int & value){
 void yarp::b(){
 	int value = 0;
 	for(int i =0;i< 4;i++){
-		value |= tempBuff[1+i]<< i*8;
+		value |= int(tempBuff[1+i])<< i*8;
 	}
 	if(value < 0 || value >maxsize){	//check if the value is larger than the maxsize of instrucitons
 		status = 3;
+		pc = value;
 	}
 	else{
 		pc = value;						//set pc equals to the value
@@ -618,7 +658,7 @@ void yarp::b(){
 void yarp::call(){
 	int value = 0;
 	for(int i =0;i< 4;i++){
-		value |= tempBuff[1+i]<< i*8;
+		value |= int(tempBuff[1+i])<< i*8;
 	}
 	push(pc);
 	pc = value;
@@ -745,7 +785,7 @@ void yarp::setRa(int result){
 	}
 }
 
-//check flag n z v
+//check flag n z
 void yarp::checkFlag(int ra,int rb, int result){
 	//check zero
 	//if result is zero
@@ -762,15 +802,6 @@ void yarp::checkFlag(int ra,int rb, int result){
 	}
 	else{
 		n = 0;
-	}
-	//check overflow
-	//if signs of ra and rb are the same and sign of result is different
-	//then there are overflow and carry
-	if((ra >>31 == rb >> 31) && (ra>>31 != result >>31)){
-		v = c = 1;
-	}
-	else{
-		v = c = 0;
 	}
 }
 
@@ -800,15 +831,19 @@ void yarp::display(int tempPC, int size, string name){
 //try to run each step
 void yarp::run(){
 	int size;    //size of each line of the instruction
-	int tempPC;
+	int tempPC;  //tempPC is just for displaying purpose
 	string name; //name of the instruction
 	for(int i =0;i<length;i++){
-		name = checkOperation(buff[pc],size);
+		name = checkOperation(buff[pc],size); //return the name of instruction
 		tempPC = pc;
-		checkOperation();
+		checkOperation();  //check the operation and call the correct function
 		display(tempPC,size,name);
 		if(status != 1){  //if any changed status, stop simulating
 			i = length;
 		}
 	}
+}
+
+bool yarp::getFileRead(){
+	return fileRead;
 }
